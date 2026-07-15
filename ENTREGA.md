@@ -1,11 +1,5 @@
 # Tech Challenge — Fase 2 | FIAP Cloud Games (FCG)
 
-## 🎥 Vídeo de apresentação
-
-**YouTube:** https://www.youtube.com/watch?v=83Mn1Ub5p2A
-
-Demonstração da arquitetura de microsserviços, comunicação assíncrona via RabbitMQ e fluxo completo de negócio (cadastro → aquisição de jogo → pagamento → notificação).
-
 ## 📦 Repositórios
 
 | Repositório | Responsabilidade |
