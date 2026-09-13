@@ -14,6 +14,17 @@ services:
       timeout: 5s
       retries: 5
 
+  mongodb:
+    image: mongo:7
+    container_name: fcg-mongo
+    ports:
+      - "27017:27017"
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   redis:
     image: redis:7-alpine
     container_name: fcg-redis
@@ -68,6 +79,8 @@ services:
     environment:
       ConnectionStrings__Default: "Server=sqlserver;Database=FCG_CatalogDB;User Id=sa;Password=Fcg@Sql2024!;TrustServerCertificate=True"
       ConnectionStrings__Redis: "redis:6379"
+      MongoDb__ConnectionString: "mongodb://mongodb:27017"
+      MongoDb__Database: "FCG_CatalogDB"
       RabbitMQ__Host: rabbitmq
       RabbitMQ__Username: guest
       RabbitMQ__Password: guest
@@ -81,6 +94,8 @@ services:
       sqlserver:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      mongodb:
         condition: service_healthy
 
   paymentsapi:
