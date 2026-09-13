@@ -78,6 +78,42 @@ Logs dos consumidores:
 docker compose logs -f notificationsapi paymentsapi catalogapi
 ```
 
+## Observabilidade
+
+**Stack escolhida: Opção A — Prometheus + Grafana** (código aberto), implantada por manifests Kubernetes.
+
+A opção por Prometheus/Grafana em vez de uma plataforma de APM gerenciada (Datadog ou New Relic) se deu por não exigir conta externa nem chave de API, e por permitir que toda a stack seja versionada e implantada junto com a aplicação — inclusive o dashboard, provisionado como código.
+
+### Instrumentação
+
+`UsersAPI` e `CatalogAPI` usam a biblioteca `prometheus-net.AspNetCore`, que expõe o endpoint `/metrics` e coleta automaticamente, a cada requisição HTTP, a duração, o total e o status code — com rótulos de controller, action e endpoint.
+
+### Dashboard
+
+O dashboard `FCG — Visão Geral dos Microsserviços` é provisionado automaticamente ao subir o Grafana e traz:
+
+| Painel | Métrica |
+|---|---|
+| Requisições por segundo | Throughput agregado |
+| Latência p95 | Percentil 95 do tempo de resposta |
+| Taxa de erro | Percentual de respostas 5xx |
+| Throughput por serviço | Requisições/s por microsserviço |
+| Latência p95 por serviço | Comparativo entre UsersAPI e CatalogAPI |
+| Requisições por status HTTP | Volume por código de resposta |
+| Latência p95 por endpoint | Detalhamento por controller/action |
+| Requisições com falha | Séries de 4xx e 5xx por serviço |
+
+### Acesso
+
+| Ferramenta | URL | Credenciais |
+|---|---|---|
+| Prometheus | http://localhost:9090 | — |
+| Grafana | http://localhost:3000 | admin / admin |
+
+### Rodando os serviços fora do Docker
+
+O arquivo `observability/prometheus/prometheus.yml` aponta para os serviços pelo nome no DNS interno (docker-compose ou Kubernetes). Se os microsserviços estiverem rodando direto na máquina via `dotnet run`, use `observability/prometheus/prometheus.local.yml`, que aponta para `host.docker.internal` nas portas locais.
+
 ## Kubernetes
 
 Manifests da infraestrutura (RabbitMQ e SQL Server) em `k8s/`. Cada microsserviço tem seus próprios manifests no diretório `k8s/` do respectivo repositório.
