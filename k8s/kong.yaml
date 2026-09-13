@@ -1,0 +1,122 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kong-declarative
+data:
+  kong.yml: |
+    # Configuracao do gateway para o cluster Kubernetes.
+    _format_version: "3.0"
+
+    services:
+      - name: usersapi
+        url: http://usersapi:80
+        routes:
+          # Cadastro e login precisam ser publicos: e aqui que o token e obtido.
+          - name: auth-publico
+            paths: ["/api/auth"]
+            strip_path: false
+
+          # Gestao de usuarios exige token valido, verificado pelo proprio gateway.
+          - name: users-protegido
+            paths: ["/api/users"]
+            strip_path: false
+            plugins:
+              - name: jwt
+                config:
+                  claims_to_verify: ["exp"]
+
+      - name: catalogapi
+        url: http://catalogapi:80
+        routes:
+          # Consulta ao catalogo e as avaliacoes é aberta.
+          - name: catalog-publico
+            paths: ["/api/games"]
+            methods: ["GET"]
+            strip_path: false
+
+          # Escrita no catalogo (criar, editar, desconto, aquisicao, avaliar) exige token.
+          - name: catalog-protegido
+            paths: ["/api/games"]
+            methods: ["POST", "PUT", "PATCH", "DELETE"]
+            strip_path: false
+            plugins:
+              - name: jwt
+                config:
+                  claims_to_verify: ["exp"]
+
+    # O gateway valida a assinatura dos tokens emitidos pelo UsersAPI.
+    # A chave do consumer corresponde a claim "iss" presente no token.
+    consumers:
+      - username: fcg-platform
+        jwt_secrets:
+          - key: FCG.UsersAPI
+            algorithm: HS256
+            secret: "super-secret-key-fcg-users-api-2024-min-32-chars!!"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kong
+  labels:
+    app: kong
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kong
+  template:
+    metadata:
+      labels:
+        app: kong
+    spec:
+      containers:
+        - name: kong
+          image: kong:3.7
+          env:
+            - name: KONG_DATABASE
+              value: "off"
+            - name: KONG_DECLARATIVE_CONFIG
+              value: /kong/declarative/kong.yml
+            - name: KONG_PROXY_ACCESS_LOG
+              value: /dev/stdout
+            - name: KONG_ADMIN_ERROR_LOG
+              value: /dev/stderr
+            - name: KONG_ADMIN_LISTEN
+              value: 0.0.0.0:8001
+          ports:
+            - name: proxy
+              containerPort: 8000
+            - name: admin
+              containerPort: 8001
+          volumeMounts:
+            - name: declarative
+              mountPath: /kong/declarative
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+      volumes:
+        - name: declarative
+          configMap:
+            name: kong-declarative
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kong
+spec:
+  # Porta de entrada unica da plataforma.
+  type: NodePort
+  selector:
+    app: kong
+  ports:
+    - name: proxy
+      port: 8000
+      targetPort: 8000
+      nodePort: 30000
+    - name: admin
+      port: 8001
+      targetPort: 8001

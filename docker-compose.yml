@@ -155,3 +155,21 @@ services:
       - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
     depends_on:
       - prometheus
+
+  kong:
+    image: kong:3.7
+    container_name: fcg-kong
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /kong/declarative/kong.yml
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001
+    volumes:
+      - ./gateway/kong.yml:/kong/declarative/kong.yml:ro
+    depends_on:
+      - usersapi
+      - catalogapi

@@ -78,6 +78,44 @@ Logs dos consumidores:
 docker compose logs -f notificationsapi paymentsapi catalogapi
 ```
 
+## API Gateway
+
+**Kong** em modo declarativo (DB-less) é a **porta de entrada única** da plataforma. Toda requisição externa passa por ele, que valida o token JWT e roteia para o microsserviço correspondente. A configuração fica versionada em `gateway/kong.yml`.
+
+### Rotas
+
+| Rota | Destino | Métodos | Token |
+|---|---|---|---|
+| `/api/auth` | UsersAPI | Todos | Não — é aqui que o token é obtido |
+| `/api/users` | UsersAPI | Todos | **Sim** |
+| `/api/games` | CatalogAPI | GET | Não — catálogo e avaliações são públicos |
+| `/api/games` | CatalogAPI | POST, PUT, PATCH, DELETE | **Sim** |
+
+### Validação de JWT no gateway
+
+O Kong valida a assinatura dos tokens emitidos pelo UsersAPI antes de encaminhar a requisição. O `consumer` declarado usa como chave a claim `iss` do token (`FCG.UsersAPI`) e o mesmo segredo HMAC da aplicação.
+
+Requisições sem token, ou com token inválido ou expirado, recebem `401` **do próprio gateway** — o tráfego não chega ao microsserviço. Dá para confirmar pelo cabeçalho da resposta: `Server: kong/3.7.1` quando o bloqueio é do gateway, contra `Server: Kestrel` quando vem da aplicação.
+
+Os microsserviços continuam validando o token por conta própria, em defesa em profundidade: mesmo que alguém alcance o serviço sem passar pelo gateway, a autorização por papel (`Admin`) continua valendo.
+
+### Acesso
+
+| Porta | Finalidade |
+|---|---|
+| 8000 | Proxy — ponto de entrada da plataforma |
+| 8001 | Admin API do Kong (inspecionar rotas e serviços) |
+
+Exemplo de uso ponta a ponta pelo gateway:
+
+```bash
+curl -X POST http://localhost:8000/api/auth/login -H "Content-Type: application/json" -d "{\"email\":\"admin@fcg.com\",\"password\":\"Admin@123\"}"
+```
+
+### Rodando os serviços fora do Docker
+
+Assim como no Prometheus, `gateway/kong.yml` aponta para os serviços pelo DNS interno. Use `gateway/kong.local.yml` quando os microsserviços estiverem rodando na máquina via `dotnet run`.
+
 ## Observabilidade
 
 **Stack escolhida: Opção A — Prometheus + Grafana** (código aberto), implantada por manifests Kubernetes.

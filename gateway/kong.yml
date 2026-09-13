@@ -1,0 +1,48 @@
+# Configuracao usada no docker-compose e no Kubernetes (servicos pelo DNS interno).
+_format_version: "3.0"
+
+services:
+  - name: usersapi
+    url: http://usersapi:8080
+    routes:
+      # Cadastro e login precisam ser publicos: e aqui que o token e obtido.
+      - name: auth-publico
+        paths: ["/api/auth"]
+        strip_path: false
+
+      # Gestao de usuarios exige token valido, verificado pelo proprio gateway.
+      - name: users-protegido
+        paths: ["/api/users"]
+        strip_path: false
+        plugins:
+          - name: jwt
+            config:
+              claims_to_verify: ["exp"]
+
+  - name: catalogapi
+    url: http://catalogapi:8080
+    routes:
+      # Consulta ao catalogo e as avaliacoes é aberta.
+      - name: catalog-publico
+        paths: ["/api/games"]
+        methods: ["GET"]
+        strip_path: false
+
+      # Escrita no catalogo (criar, editar, desconto, aquisicao, avaliar) exige token.
+      - name: catalog-protegido
+        paths: ["/api/games"]
+        methods: ["POST", "PUT", "PATCH", "DELETE"]
+        strip_path: false
+        plugins:
+          - name: jwt
+            config:
+              claims_to_verify: ["exp"]
+
+# O gateway valida a assinatura dos tokens emitidos pelo UsersAPI.
+# A chave do consumer corresponde a claim "iss" presente no token.
+consumers:
+  - username: fcg-platform
+    jwt_secrets:
+      - key: FCG.UsersAPI
+        algorithm: HS256
+        secret: "super-secret-key-fcg-users-api-2024-min-32-chars!!"
