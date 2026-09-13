@@ -12,8 +12,8 @@ Orquestração da plataforma **FIAP Cloud Games (FCG)** — sobe toda a arquitet
                 ┌───────────────┼───────────────────┐
                 ▼               ▼                   │
      ┌──────────────────┐  ┌──────────────────────┐ │
-     │  FCG.CatalogAPI  │  │ FCG.NotificationsAPI │ │
-     │      :5002       │  │        :5004         │ │
+     │  FCG.CatalogAPI  │  │ NotificationsFunction│ │
+     │      :5002       │  │     (serverless)     │ │
      └────────┬─────────┘  └──────────▲───────────┘ │
               │ OrderPlacedEvent      │             │
               ▼                       │ PaymentProcessedEvent
@@ -33,7 +33,7 @@ Orquestração da plataforma **FIAP Cloud Games (FCG)** — sobe toda a arquitet
 | [FCG.UsersAPI](https://github.com/Marcelo1080p/FCG.UsersAPI) | Usuários e autenticação JWT |
 | [FCG.CatalogAPI](https://github.com/Marcelo1080p/FCG.CatalogAPI) | Catálogo de jogos e aquisições |
 | [FCG.PaymentsAPI](https://github.com/Marcelo1080p/FCG.PaymentsAPI) | Processamento de pagamentos |
-| [FCG.NotificationsAPI](https://github.com/Marcelo1080p/FCG.NotificationsAPI) | Notificações orientadas a eventos |
+| [FCG.NotificationsFunction](https://github.com/Marcelo1080p/FCG.NotificationsFunction) | Notificações como função serverless |
 
 ## Como executar
 
@@ -57,7 +57,7 @@ docker compose up -d --build
 | UsersAPI (Swagger) | http://localhost:5001/swagger |
 | CatalogAPI (Swagger) | http://localhost:5002/swagger |
 | PaymentsAPI (Swagger) | http://localhost:5003/swagger |
-| NotificationsAPI (health) | http://localhost:5004/health |
+| NotificationsFunction | sem porta — acionada pelas filas |
 | RabbitMQ Management | http://localhost:15672 (guest/guest) |
 
 ## Fluxo de teste ponta a ponta
@@ -76,6 +76,25 @@ Logs dos consumidores:
 
 ```bash
 docker compose logs -f notificationsapi paymentsapi catalogapi
+```
+
+## Arquitetura serverless
+
+O antigo microsserviço `FCG.NotificationsAPI` foi substituído por uma **função serverless**, no repositório [FCG.NotificationsFunction](https://github.com/Marcelo1080p/FCG.NotificationsFunction).
+
+O serviço passava a maior parte do tempo ocioso, apenas aguardando eventos esporádicos — manter um container de pé 24 horas por dia para isso desperdiçava recursos. Como função, o código só executa quando chega mensagem na fila.
+
+| Função | Fila que dispara | Ação |
+|---|---|---|
+| `UserCreatedFunction` | `notifications-user-created` | Boas-vindas ao novo usuário |
+| `PaymentProcessedFunction` | `notifications-payment-processed` | Confirmação da compra |
+
+A função é **Azure Functions v4** (.NET 8, isolated worker), acionada diretamente pelas filas do RabbitMQ — sem endpoint HTTP. Localmente ela roda no runtime oficial do Azure Functions em container, acompanhada do **Azurite**, emulador de storage exigido pelo runtime. A infraestrutura de produção está descrita em Bicep, no diretório `infra/` daquele repositório, usando plano de consumo (`Y1`).
+
+Para acompanhar o acionamento:
+
+```bash
+docker compose logs -f notificationsfunction
 ```
 
 ## API Gateway

@@ -1,0 +1,88 @@
+# Emulador de storage exigido pelo runtime do Azure Functions.
+# Em producao no Azure, este papel e cumprido por uma Storage Account real,
+# provisionada pelo Bicep em FCG.NotificationsFunction/infra.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: azurite
+  labels:
+    app: azurite
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: azurite
+  template:
+    metadata:
+      labels:
+        app: azurite
+    spec:
+      containers:
+        - name: azurite
+          image: mcr.microsoft.com/azure-storage/azurite
+          ports:
+            - containerPort: 10000
+            - containerPort: 10001
+            - containerPort: 10002
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: azurite
+spec:
+  type: ClusterIP
+  selector:
+    app: azurite
+  ports:
+    - name: blob
+      port: 10000
+      targetPort: 10000
+    - name: queue
+      port: 10001
+      targetPort: 10001
+    - name: table
+      port: 10002
+      targetPort: 10002
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: notificationsfunction-secret
+type: Opaque
+stringData:
+  AzureWebJobsStorage: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1"
+  RabbitMQConnection: "amqp://guest:guest@rabbitmq:5672/"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notificationsfunction
+  labels:
+    app: notificationsfunction
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notificationsfunction
+  template:
+    metadata:
+      labels:
+        app: notificationsfunction
+    spec:
+      containers:
+        - name: notificationsfunction
+          image: fcg-notifications-function:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: FUNCTIONS_WORKER_RUNTIME
+              value: "dotnet-isolated"
+          envFrom:
+            - secretRef:
+                name: notificationsfunction-secret
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
