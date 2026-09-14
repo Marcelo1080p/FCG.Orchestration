@@ -1,0 +1,69 @@
+# Manifests do FCG.PaymentsAPI, consolidados aqui para permitir
+# subir a plataforma inteira com um unico kubectl apply -f k8s/
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: paymentsapi-config
+data:
+  RabbitMQ__Host: "rabbitmq"
+  RabbitMQ__Username: "guest"
+  Jwt__Issuer: "FCG.UsersAPI"
+  Jwt__Audience: "FCG"
+  Jwt__ExpirationMinutes: "60"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: paymentsapi-secret
+type: Opaque
+stringData:
+  ConnectionStrings__Default: "Server=sqlserver;Database=FCG_PaymentsDB;User Id=sa;Password=Fcg@Sql2024!;TrustServerCertificate=True"
+  Jwt__Secret: "super-secret-key-fcg-users-api-2024-min-32-chars!!"
+  RabbitMQ__Password: "guest"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: paymentsapi
+  labels:
+    app: paymentsapi
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: paymentsapi
+  template:
+    metadata:
+      labels:
+        app: paymentsapi
+    spec:
+      containers:
+        - name: paymentsapi
+          image: fcg-paymentsapi:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: paymentsapi-config
+            - secretRef:
+                name: paymentsapi-secret
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: paymentsapi
+spec:
+  type: ClusterIP
+  selector:
+    app: paymentsapi
+  ports:
+    - port: 80
+      targetPort: 8080

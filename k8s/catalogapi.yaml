@@ -1,0 +1,72 @@
+# Manifests do FCG.CatalogAPI, consolidados aqui para permitir
+# subir a plataforma inteira com um unico kubectl apply -f k8s/
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: catalogapi-config
+data:
+  RabbitMQ__Host: "rabbitmq"
+  RabbitMQ__Username: "guest"
+  Jwt__Issuer: "FCG.UsersAPI"
+  Jwt__Audience: "FCG"
+  Jwt__ExpirationMinutes: "60"
+  MongoDb__Database: "FCG_CatalogDB"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: catalogapi-secret
+type: Opaque
+stringData:
+  ConnectionStrings__Default: "Server=sqlserver;Database=FCG_CatalogDB;User Id=sa;Password=Fcg@Sql2024!;TrustServerCertificate=True"
+  ConnectionStrings__Redis: "redis:6379"
+  Jwt__Secret: "super-secret-key-fcg-users-api-2024-min-32-chars!!"
+  RabbitMQ__Password: "guest"
+  MongoDb__ConnectionString: "mongodb://mongodb:27017"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: catalogapi
+  labels:
+    app: catalogapi
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: catalogapi
+  template:
+    metadata:
+      labels:
+        app: catalogapi
+    spec:
+      containers:
+        - name: catalogapi
+          image: fcg-catalogapi:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: catalogapi-config
+            - secretRef:
+                name: catalogapi-secret
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: catalogapi
+spec:
+  type: ClusterIP
+  selector:
+    app: catalogapi
+  ports:
+    - port: 80
+      targetPort: 8080

@@ -37,7 +37,7 @@ Orquestração da plataforma **FIAP Cloud Games (FCG)** — sobe toda a arquitet
 
 ## Como executar
 
-Pré-requisito: Docker Desktop. Os 4 repositórios devem estar clonados como irmãos desta pasta:
+Pré-requisito: Docker Desktop. Os 5 repositórios devem estar clonados como irmãos desta pasta:
 
 ```
 FCG/
@@ -45,7 +45,7 @@ FCG/
 ├── FCG.UsersAPI/
 ├── FCG.CatalogAPI/
 ├── FCG.PaymentsAPI/
-└── FCG.NotificationsAPI/
+└── FCG.NotificationsFunction/
 ```
 
 ```bash
@@ -65,7 +65,7 @@ docker compose up -d --build
 1. **Login como admin** — `POST /api/auth/login` no UsersAPI (`admin@fcg.com` / `Admin@123`)
 2. **Cadastrar um jogo** — `POST /api/games` no CatalogAPI com o token de admin
 3. **Registrar um usuário** — `POST /api/auth/register` no UsersAPI
-   - NotificationsAPI loga a mensagem de boas-vindas (`UserCreatedEvent`)
+   - A Function serverless loga a mensagem de boas-vindas (`UserCreatedEvent`)
 4. **Login com o novo usuário** e **adquirir o jogo** — `POST /api/games/{id}/acquire`
    - CatalogAPI publica `OrderPlacedEvent`
    - PaymentsAPI processa o pagamento e publica `PaymentProcessedEvent`
@@ -75,7 +75,7 @@ docker compose up -d --build
 Logs dos consumidores:
 
 ```bash
-docker compose logs -f notificationsapi paymentsapi catalogapi
+docker compose logs -f notificationsfunction paymentsapi catalogapi
 ```
 
 ## Arquitetura serverless
@@ -173,12 +173,48 @@ O arquivo `observability/prometheus/prometheus.yml` aponta para os serviços pel
 
 ## Kubernetes
 
-Manifests da infraestrutura (RabbitMQ e SQL Server) em `k8s/`. Cada microsserviço tem seus próprios manifests no diretório `k8s/` do respectivo repositório.
+Todos os manifests da plataforma estão consolidados em `k8s/` — infraestrutura, microsserviços, gateway, observabilidade e a função serverless. São 37 recursos (Deployment, Service, ConfigMap e Secret), o que permite subir o ambiente inteiro com um único comando.
+
+### Pré-requisito: habilitar o Kubernetes
+
+No **Docker Desktop**, vá em *Settings → Kubernetes* e marque *Enable Kubernetes*. Confirme com:
+
+```bash
+kubectl cluster-info
+```
+
+### Construir as imagens
+
+O cluster do Docker Desktop usa o mesmo daemon local, então basta construir as imagens — não é preciso registry:
+
+```bash
+docker compose build
+docker build -t fcg-notifications-function ../FCG.NotificationsFunction
+```
+
+### Deploy
 
 ```bash
 kubectl apply -f k8s/
-kubectl apply -f ../FCG.UsersAPI/k8s/
-kubectl apply -f ../FCG.CatalogAPI/k8s/
-kubectl apply -f ../FCG.PaymentsAPI/k8s/
-kubectl apply -f ../FCG.NotificationsAPI/k8s/
+```
+
+### Verificar
+
+```bash
+kubectl get pods
+kubectl get services
+```
+
+A plataforma fica acessível pelo gateway em `http://localhost:30000` (NodePort do Kong).
+
+Para acompanhar um serviço específico:
+
+```bash
+kubectl logs -f deployment/notificationsfunction
+```
+
+### Remover
+
+```bash
+kubectl delete -f k8s/
 ```
