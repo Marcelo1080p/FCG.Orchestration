@@ -1,7 +1,5 @@
 # Diagramas da arquitetura
 
-Diagramas em Mermaid para apresentação. No Excalidraw, use **More tools → Mermaid to Excalidraw** e cole o conteúdo de cada bloco (sem as crases).
-
 ---
 
 ## 1. Evolução do projeto
