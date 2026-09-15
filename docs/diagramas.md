@@ -247,10 +247,3 @@ flowchart LR
 ```
 
 ---
-
-## Dicas de uso
-
-- No Excalidraw: **More tools → Mermaid to Excalidraw**, cole o bloco e clique em *Insert*.
-- O conversor suporta bem `flowchart` e `sequenceDiagram`. Se algum diagrama não converter, simplifique removendo os `subgraph`.
-- Depois de inserido, tudo vira elemento editável: dá para reposicionar, mudar cores e destacar partes durante a apresentação.
-- Sugestão de ordem na apresentação: diagrama 1 (contexto) → 2 (visão geral) → 3 e 4 (fluxos) → 5, 6, 7 e 8 (requisitos da fase, um a um).
